@@ -1,3 +1,3 @@
 # `git gitlab-init`
-<br />
-Initializes a repository remotely, too.
+<br /><br />
+_Initializes a repository remotely, too._
