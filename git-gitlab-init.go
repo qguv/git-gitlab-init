@@ -31,7 +31,7 @@ Options:
 func main() {
     args, err := docopt.Parse(helpstring, argsToParse, automaticHelp, version, optionsFirst)
     if err != nil {
-        return panic(err)
+        panic(err)
     }
     for k, v := range args {
         print(k)
