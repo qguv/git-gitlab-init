@@ -19,13 +19,17 @@ var (
 
 Create an empty Git repository on GitLab and locally.
 
+The commands below can be used as "git gitlab-init" or as "git-gitlab-init".
+
 Usage:
-  git gitlab-init [-u <api url>] [-k <api key>] [--] <repository> [<directory>]
+  git-gitlab-init (-h | --help | --version)
+  git-gitlab-init [-u API_URL] [-k API_KEY] [--] <repository> [<directory>]
 
 Options:
-  -h --help     Show this screen.
-  -u            Specify GitLab api url.
-  -k            Specify GitLab api key.
+  -h, --help    Show this screen and exit.
+  -u API_URL    Specify GitLab api url.
+  -k API_KEY    Specify GitLab api key.
+  --version     Print version and exit.
 `
 )
 
