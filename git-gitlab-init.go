@@ -12,7 +12,7 @@ import (
 
 var (
     version string = "0.1.0"
-    argsToParse []string = os.Args
+    argsToParse []string = os.Args[1:]
     automaticHelp bool = true
     optionsFirst bool = true
     helpstring string = `git gitlab-init
