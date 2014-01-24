@@ -6,6 +6,7 @@ package main
 
 import (
     "os"
+    "fmt"
     "github.com/docopt/docopt.go"
 )
 
@@ -33,9 +34,5 @@ func main() {
     if err != nil {
         panic(err)
     }
-    for k, v := range args {
-        print(k)
-        print(v)
-        print('\n')
-    }
+    fmt.Println(args)
 }
