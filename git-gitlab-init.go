@@ -5,6 +5,7 @@ Initializes a repository remotely for GitLab-hosted origin servers.
 package main
 
 import (
+    "strings"
     "fmt"
     "github.com/docopt/docopt.go"
     "io/ioutil"
@@ -102,10 +103,7 @@ func apiCommand(url string, data string, token string, apiVersion string) string
 func getSetting(setting string) (out string, err error) {
     cmd := exec.Command("git", "config", "--get", setting)
     raw_out, err := cmd.Output()
-    if err != nil {
-        panic(err)
-    }
-    out = string(raw_out)
+    out = strings.Trim(string(raw_out), "\n")
     return
 }
 
@@ -150,9 +148,9 @@ func main() {
     if len(badOptions) != 0 {
         complainUndefined(badOptions)
     } else {
-        fmt.Println("username: ", username)
-        fmt.Println("api version: ", apiVersion)
-        fmt.Println("token: ", token)
-        fmt.Println("url: ", url)
+        fmt.Println("username:", username)
+        fmt.Println("api version:", apiVersion)
+        fmt.Println("token:", token)
+        fmt.Println("url:", url)
     }
 }
