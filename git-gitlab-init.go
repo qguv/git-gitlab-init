@@ -24,13 +24,13 @@ The commands below can be used as "git gitlab-init" or as "git-gitlab-init".
 
 Usage:
   git-gitlab-init (-h | --help | --version)
-  git-gitlab-init [-u API_URL] [-k API_KEY] [--] <repository> [<directory>]
+  git-gitlab-init [-u API_VERSION] [-k API_KEY] [--] <repository> [<directory>]
 
 Options:
-  -h, --help    Show this screen and exit.
-  -u API_URL    Specify GitLab api url.
-  -k API_KEY    Specify GitLab api key.
-  --version     Print version and exit.
+  -h, --help        Show this screen and exit.
+  -u API_VERSION    Specify GitLab api version url [default: v3].
+  -k API_KEY        Specify GitLab api key.
+  --version         Print version and exit.
 `
 )
 
