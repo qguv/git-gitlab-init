@@ -147,6 +147,7 @@ func main() {
     username, url, apiVersion, token, badOptions := varsFromGitConfig()
     if len(badOptions) != 0 {
         complainUndefined(badOptions)
+        return
     } else {
         fmt.Println("username:", username)
         fmt.Println("api version:", apiVersion)
