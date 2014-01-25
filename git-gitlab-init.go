@@ -11,6 +11,7 @@ import (
 )
 
 var (
+    // Variables about this program
     version       string   = "0.1.0"
     argsToParse   []string = os.Args[1:]
     automaticHelp bool     = true
