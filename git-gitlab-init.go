@@ -44,29 +44,6 @@ func runCommand(name string, arg ...string) (string, error) {
     return out, err
 }
 
-func getSetting(name string) string {
-    cmd := exec.Command("git", "config", "--get", name)
-    raw_out, err := cmd.Output()
-    if err != nil {
-        panic(err)
-    }
-    return string(raw_out)
-}
-
-func sendGet(s string) string {
-    fmt.Println(s) //debug
-    resp, err := http.Get("http://example.com/")
-    if err != nil {
-        panic(err)
-    }
-    defer resp.Body.Close()
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        panic(err)
-    }
-    return string(body)
-}
-
 /*
    git init
    touch README
@@ -75,17 +52,6 @@ func sendGet(s string) string {
    git remote add origin http://src.nascifi.com:8080/quintus/tmp-testing.git
    git push -u origin master
 */
-
-func complainUndefined(options [][2]string) {
-    fmt.Println("Error! Your Gitlab API settings aren't defined.")
-    fmt.Println("Try running the following:\n")
-    var param [2]string
-    for _, param = range options {
-        setting, desc := param[0], param[1]
-        fmt.Println("    git config --global " + setting + " \"" + desc + "\"")
-    }
-    fmt.Println("")
-}
 
 func initialize(projectName string, user string, url string, dir string) (ok bool) {
     runCommand("git", "init")
@@ -107,16 +73,86 @@ func initialize(projectName string, user string, url string, dir string) (ok boo
     return true // ok
 }
 
+func sendGet(url string) string {
+    resp, err := http.Get(url)
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
+    body, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        panic(err)
+    }
+    return string(body)
+}
+
+func apiCommand(url string, data string, token string, apiVersion string) string {
+    if url[len(url)-1] != "/"[0] {
+        url += "/"
+    }
+    if data[0] != "&"[0] {
+        data = "&" + data
+    }
+    request := url + "api/" + apiVersion + "/" + url
+    request += "?private_token=" + token
+    request += data
+    return sendGet(request)
+}
+
+func getSetting(setting string) (out string, err error) {
+    cmd := exec.Command("git", "config", "--get", setting)
+    raw_out, err := cmd.Output()
+    if err != nil {
+        panic(err)
+    }
+    out = string(raw_out)
+    return
+}
+
+func softGetSetting(setting string, desc string, badOptions [][2]string) (out string, newBadOptions [][2]string) {
+    out, err := getSetting(setting)
+    if err != nil {
+        newBadOptions = append(badOptions, [2]string{setting, desc})
+    } else {
+        newBadOptions = badOptions
+    }
+    return
+}
+
+func complainUndefined(options [][2]string) {
+    fmt.Println("Error! Your Gitlab API settings aren't defined.")
+    fmt.Println("Try running the following:\n")
+    var param [2]string
+    for _, param = range options {
+        setting, desc := param[0], param[1]
+        fmt.Println("    git config --global " + setting + " \"" + desc + "\"")
+    }
+    fmt.Println("")
+}
+
+func varsFromGitConfig() (username string, url string, apiVersion string, token string, badOptions [][2]string) {
+    username, badOptions = softGetSetting("gitlab.username", "gitlabusername", badOptions)
+    url, badOptions = softGetSetting("gitlab.url", "http://my.gitlab.instance/", badOptions)
+    if url[len(url)-1] != "/"[0] {
+        url = url + "/"
+    }
+    apiVersion, badOptions = softGetSetting("gitlab.api", "v3", badOptions)
+    token, badOptions = softGetSetting("gitlab.token", "your_gitlab_token", badOptions)
+    return
+}
+
 func main() {
     _, err := docopt.Parse(helpstring, argsToParse, automaticHelp, version, optionsFirst)
     if err != nil {
         panic(err)
     }
-    var options [][2]string
-    options = append(
-        options,
-        [2]string{"user.name", "First Last"},
-        [2]string{"gitlab.api", "v3"},
-    )
-    complainUndefined(options)
+    username, url, apiVersion, token, badOptions := varsFromGitConfig()
+    if len(badOptions) != 0 {
+        complainUndefined(badOptions)
+    } else {
+        fmt.Println("username: ", username)
+        fmt.Println("api version: ", apiVersion)
+        fmt.Println("token: ", token)
+        fmt.Println("url: ", url)
+    }
 }
