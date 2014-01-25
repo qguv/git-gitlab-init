@@ -108,7 +108,7 @@ func initialize(projectName string, user string, url string, dir string) (ok boo
 }
 
 func main() {
-    args, err := docopt.Parse(helpstring, argsToParse, automaticHelp, version, optionsFirst)
+    _, err := docopt.Parse(helpstring, argsToParse, automaticHelp, version, optionsFirst)
     if err != nil {
         panic(err)
     }
