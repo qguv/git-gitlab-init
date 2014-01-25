@@ -113,7 +113,10 @@ func main() {
         panic(err)
     }
     var options [][2]string
-    options = append(options, [2]string{"user.name", "First Last"})
-    options = append(options, [2]string{"gitlab.api", "v3"})
+    options = append(
+        options,
+        [2]string{"user.name", "First Last"},
+        [2]string{"gitlab.api", "v3"},
+    )
     complainUndefined(options)
 }
