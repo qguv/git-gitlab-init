@@ -30,7 +30,7 @@ The commands below can be used as "git gitlab-init" or as "git-gitlab-init".
 Usage:
   git-gitlab-init (-h | --help | --version)
   git-gitlab-init [-p PRIVACYLEVEL] [-u USERNAME] [-l URL] [-d DESCRIPTION]
-                  [-v API_VERSION] [-t API_TOKEN] [--] <repository>
+                  [-v API_VERSION] [-t API_TOKEN] [--debug] [--] <repository>
 
 Arguments:
   <repository>      Specify repository name.
@@ -44,6 +44,7 @@ Options:
   -l URL            Specify Gitlab instance url.
   -v API_VERSION    Specify Gitlab api version url. [default: v3]
   -t API_TOKEN      Specify Gitlab api token, found in your Gitlab profile settings.
+  --debug           You hopefully won't need this option.
   --version         Prints version and exits.
 `
 )
@@ -192,8 +193,13 @@ func main() { //testing
     if err != nil {
         panic(err)
     }
+
+    debug := args["--debug"].(bool)
+
     username, root, apiVersion, token, badOptions := varsFromGitConfig()
-    fmt.Println(args)
+    if debug {
+        fmt.Println(args)
+    }
 
     // Overriding config parameters from docopt
     if username_opt, ok := args["-u"].(string); ok {
@@ -230,11 +236,17 @@ func main() { //testing
     name := args["<repository>"].(string)
     protection := args["-p"].(string)
 
-    fmt.Println("username:", username)
-    fmt.Println("api version:", apiVersion)
-    fmt.Println("token:", token)
-    fmt.Println("url:", root)
+    if debug {
+        fmt.Println("username:", username)
+        fmt.Println("api version:", apiVersion)
+        fmt.Println("token:", token)
+        fmt.Println("url:", root)
+    }
 
-    fmt.Println(makeRemoteRepo(root, name, description, token, apiVersion, protection))
+    response := makeRemoteRepo(root, name, description, token, apiVersion, protection)
+    if debug {
+        fmt.Println(response)
+    }
+
     initialize(name, username, root)
 }
