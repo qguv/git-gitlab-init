@@ -5,13 +5,13 @@ Initializes a repository remotely for GitLab-hosted origin servers.
 package main
 
 import (
-    "strings"
     "fmt"
     "github.com/docopt/docopt.go"
     "io/ioutil"
     "net/http"
     "os"
     "os/exec"
+    "strings"
 )
 
 var (
@@ -28,15 +28,42 @@ The commands below can be used as "git gitlab-init" or as "git-gitlab-init".
 
 Usage:
   git-gitlab-init (-h | --help | --version)
-  git-gitlab-init [-u API_VERSION] [-k API_KEY] [--] <repository> [<directory>]
+  git-gitlab-init [-p PRIVACYLEVEL] [-u USERNAME] [-l URL] [-d DESCRIPTION]
+                  [-v API_VERSION] [-t API_TOKEN] [--] <repository> [<directory>]
+
+Arguments:
+  <repository>      Specify repository name.
+  <directory>       Optionally specify local directory name.
 
 Options:
-  -h, --help        Show this screen and exit.
-  -u API_VERSION    Specify GitLab api version url [default: v3].
-  -k API_KEY        Specify GitLab api key.
-  --version         Print version and exit.
+  -h, --help        Shows this screen and exit.
+  -p PRIVACYLEVEL   Sets viewing permission status of repository. Valid options
+                    are public, private, or internal. [default: private]
+  -d DESCRIPTION    Specify repository description.
+  -u USERNAME       Specify Gitlab username.
+  -l URL            Specify Gitlab instance url.
+  -v API_VERSION    Specify Gitlab api version url. [default: v3]
+  -t API_TOKEN      Specify Gitlab api token, found in your Gitlab profile settings.
+  --version         Prints version and exits.
 `
 )
+
+func findInSlice(s string, slice [][2]string) int {
+    for i, v := range slice {
+        if (v[0] == s) {
+            return i
+        }
+    }
+    return -1
+}
+
+func removeGood(s string, slice [][2]string) [][2]string {
+    i := findInSlice(s, slice)
+    if i != -1 {
+        return append(slice[:i], slice[i+1:]...)
+    }
+    return [][2]string{}
+}
 
 func runCommand(name string, arg ...string) (string, error) {
     cmd := exec.Command(name, arg...)
@@ -139,19 +166,35 @@ func varsFromGitConfig() (username string, url string, apiVersion string, token 
     return
 }
 
-func main() {
-    _, err := docopt.Parse(helpstring, argsToParse, automaticHelp, version, optionsFirst)
+func main() { //testing
+    args, err := docopt.Parse(helpstring, argsToParse, automaticHelp, version, optionsFirst)
     if err != nil {
         panic(err)
     }
     username, url, apiVersion, token, badOptions := varsFromGitConfig()
+    fmt.Println(args)
     if len(badOptions) != 0 {
         complainUndefined(badOptions)
         return
-    } else {
-        fmt.Println("username:", username)
-        fmt.Println("api version:", apiVersion)
-        fmt.Println("token:", token)
-        fmt.Println("url:", url)
     }
+    if username_opt, ok := args["-u"].(string); ok {
+        username = username_opt
+        badOptions = removeGood("gitlab.username", badOptions)
+    }
+    if url_opt, ok := args["-l"].(string); ok {
+        url = url_opt
+        badOptions = removeGood("gitlab.url", badOptions)
+    }
+    if api_opt, ok := args["-v"].(string); ok {
+        apiVersion = api_opt
+        badOptions = removeGood("gitlab.api", badOptions)
+    }
+    if token_opt, ok := args["-t"].(string); ok {
+        token = token_opt
+        badOptions = removeGood("gitlab.token", badOptions)
+    }
+    fmt.Println("username:", username)
+    fmt.Println("api version:", apiVersion)
+    fmt.Println("token:", token)
+    fmt.Println("url:", url)
 }
