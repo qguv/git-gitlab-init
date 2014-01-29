@@ -5,6 +5,7 @@ Initializes a repository remotely for GitLab-hosted origin servers.
 package main
 
 import (
+    "net/url"
     "fmt"
     "github.com/docopt/docopt.go"
     "io/ioutil"
@@ -29,11 +30,10 @@ The commands below can be used as "git gitlab-init" or as "git-gitlab-init".
 Usage:
   git-gitlab-init (-h | --help | --version)
   git-gitlab-init [-p PRIVACYLEVEL] [-u USERNAME] [-l URL] [-d DESCRIPTION]
-                  [-v API_VERSION] [-t API_TOKEN] [--] <repository> [<directory>]
+                  [-v API_VERSION] [-t API_TOKEN] [--] <repository>
 
 Arguments:
   <repository>      Specify repository name.
-  <directory>       Optionally specify local directory name.
 
 Options:
   -h, --help        Shows this screen and exit.
@@ -97,12 +97,13 @@ func initialize(projectName string, user string, url string, dir string) (ok boo
 
     runCommand("git", "add", "README.md")
     runCommand("git", "commit", "-m", "initial commit")
-    runCommand("git", "remote", "add", "origin", "")
+    runCommand("git", "remote", "add", "origin", url)
+    runCommand("git", "push", "-u", "origin", "master")
     return true // ok
 }
 
-func sendGet(url string) string {
-    resp, err := http.Get(url)
+func sendPost(url string, data url.Values) string {
+    resp, err := http.PostForm(url, data)
     if err != nil {
         panic(err)
     }
@@ -114,17 +115,31 @@ func sendGet(url string) string {
     return string(body)
 }
 
-func apiCommand(url string, data string, token string, apiVersion string) string {
-    if url[len(url)-1] != "/"[0] {
-        url += "/"
+func apiCommand(root string, url string, data url.Values, token string, apiVersion string) string {
+    if root[len(root)-1] != "/"[0] {
+        root += "/"
     }
-    if data[0] != "&"[0] {
-        data = "&" + data
-    }
-    request := url + "api/" + apiVersion + "/" + url
+    request := root + "api/" + apiVersion + "/" + url
     request += "?private_token=" + token
-    request += data
-    return sendGet(request)
+    return sendPost(request, data)
+}
+
+func makeRemoteRepo(root string, name string, description string, token string, apiVersion string, protection string) string {
+    data := make(url.Values)
+    data.Set("name", name)
+    if description != "" {
+        data.Set("description", description)
+    }
+    if protection == "private" {
+        data.Set("visibility_level", "0")
+    } else if protection == "public" {
+        data.Set("visibility_level", "20")
+    } else if protection == "internal" {
+        data.Set("visibility_level", "10")
+    } else {
+        return "ERROR! in protection" // #DEBUG
+    }
+    return apiCommand(root, "projects", data, token, apiVersion)
 }
 
 func getSetting(setting string) (out string, err error) {
@@ -155,11 +170,11 @@ func complainUndefined(options [][2]string) {
     fmt.Println("")
 }
 
-func varsFromGitConfig() (username string, url string, apiVersion string, token string, badOptions [][2]string) {
+func varsFromGitConfig() (username string, root string, apiVersion string, token string, badOptions [][2]string) {
     username, badOptions = softGetSetting("gitlab.username", "gitlabusername", badOptions)
-    url, badOptions = softGetSetting("gitlab.url", "http://my.gitlab.instance/", badOptions)
-    if url[len(url)-1] != "/"[0] {
-        url = url + "/"
+    root, badOptions = softGetSetting("gitlab.url", "http://my.gitlab.instance/", badOptions)
+    if root[len(root)-1] != "/"[0] {
+        root = root + "/"
     }
     apiVersion, badOptions = softGetSetting("gitlab.api", "v3", badOptions)
     token, badOptions = softGetSetting("gitlab.token", "your_gitlab_token", badOptions)
@@ -171,18 +186,16 @@ func main() { //testing
     if err != nil {
         panic(err)
     }
-    username, url, apiVersion, token, badOptions := varsFromGitConfig()
+    username, root, apiVersion, token, badOptions := varsFromGitConfig()
     fmt.Println(args)
-    if len(badOptions) != 0 {
-        complainUndefined(badOptions)
-        return
-    }
+
+    // Overriding config parameters from docopt
     if username_opt, ok := args["-u"].(string); ok {
         username = username_opt
         badOptions = removeGood("gitlab.username", badOptions)
     }
     if url_opt, ok := args["-l"].(string); ok {
-        url = url_opt
+        root = url_opt
         badOptions = removeGood("gitlab.url", badOptions)
     }
     if api_opt, ok := args["-v"].(string); ok {
@@ -193,8 +206,26 @@ func main() { //testing
         token = token_opt
         badOptions = removeGood("gitlab.token", badOptions)
     }
+
+    if len(badOptions) != 0 {
+        complainUndefined(badOptions)
+        return
+    }
+
+    // Setting repo settings from docopt
+    var description string
+    if description_opt, ok := args["-d"].(string); ok {
+        description = description_opt
+    } else {
+        description = ""
+    }
+    name := args["<repository>"].(string)
+    protection := args["-p"].(string)
+
     fmt.Println("username:", username)
     fmt.Println("api version:", apiVersion)
     fmt.Println("token:", token)
-    fmt.Println("url:", url)
+    fmt.Println("url:", root)
+
+    fmt.Println(makeRemoteRepo(root, name, description, token, apiVersion, protection))
 }
