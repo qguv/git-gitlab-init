@@ -5,11 +5,11 @@ Initializes a repository remotely for GitLab-hosted origin servers.
 package main
 
 import (
-    "net/url"
     "fmt"
     "github.com/docopt/docopt.go"
     "io/ioutil"
     "net/http"
+    "net/url"
     "os"
     "os/exec"
     "strings"
@@ -50,7 +50,7 @@ Options:
 
 func findInSlice(s string, slice [][2]string) int {
     for i, v := range slice {
-        if (v[0] == s) {
+        if v[0] == s {
             return i
         }
     }
