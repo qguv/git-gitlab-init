@@ -57,6 +57,13 @@ func findInSlice(s string, slice [][2]string) int {
     return -1
 }
 
+func scrubUrl(webaddress string) string {
+    if webaddress[len(webaddress)-1] != "/"[0] {
+        webaddress += "/"
+    }
+    return webaddress
+}
+
 func removeGood(s string, slice [][2]string) [][2]string {
     i := findInSlice(s, slice)
     if i != -1 {
@@ -81,29 +88,32 @@ func runCommand(name string, arg ...string) (string, error) {
    git push -u origin master
 */
 
-func initialize(projectName string, user string, url string, dir string) (ok bool) {
+func initialize(projectName string, user string, webaddress string) (ok bool) {
     runCommand("git", "init")
 
-    f, err := os.OpenFile("README.md", os.O_APPEND|os.O_WRONLY, 0600)
+    f, err := os.Create("README.md")
     if err != nil {
         panic(err)
     }
-    defer f.Close()
 
     _, err = f.WriteString("# " + projectName)
     if err != nil {
         panic(err)
     }
 
+    f.Close()
+
+    webaddress = scrubUrl(webaddress)
+    origin_webaddress := webaddress + user + "/" + projectName + ".git"
     runCommand("git", "add", "README.md")
     runCommand("git", "commit", "-m", "initial commit")
-    runCommand("git", "remote", "add", "origin", url)
+    runCommand("git", "remote", "add", "origin", origin_webaddress)
     runCommand("git", "push", "-u", "origin", "master")
     return true // ok
 }
 
-func sendPost(url string, data url.Values) string {
-    resp, err := http.PostForm(url, data)
+func sendPost(webaddress string, data url.Values) string {
+    resp, err := http.PostForm(webaddress, data)
     if err != nil {
         panic(err)
     }
@@ -115,11 +125,9 @@ func sendPost(url string, data url.Values) string {
     return string(body)
 }
 
-func apiCommand(root string, url string, data url.Values, token string, apiVersion string) string {
-    if root[len(root)-1] != "/"[0] {
-        root += "/"
-    }
-    request := root + "api/" + apiVersion + "/" + url
+func apiCommand(root string, webaddress string, data url.Values, token string, apiVersion string) string {
+    root = scrubUrl(root)
+    request := root + "api/" + apiVersion + "/" + webaddress
     request += "?private_token=" + token
     return sendPost(request, data)
 }
@@ -173,9 +181,7 @@ func complainUndefined(options [][2]string) {
 func varsFromGitConfig() (username string, root string, apiVersion string, token string, badOptions [][2]string) {
     username, badOptions = softGetSetting("gitlab.username", "gitlabusername", badOptions)
     root, badOptions = softGetSetting("gitlab.url", "http://my.gitlab.instance/", badOptions)
-    if root[len(root)-1] != "/"[0] {
-        root = root + "/"
-    }
+    root = scrubUrl(root)
     apiVersion, badOptions = softGetSetting("gitlab.api", "v3", badOptions)
     token, badOptions = softGetSetting("gitlab.token", "your_gitlab_token", badOptions)
     return
@@ -194,8 +200,8 @@ func main() { //testing
         username = username_opt
         badOptions = removeGood("gitlab.username", badOptions)
     }
-    if url_opt, ok := args["-l"].(string); ok {
-        root = url_opt
+    if webaddress_opt, ok := args["-l"].(string); ok {
+        root = webaddress_opt
         badOptions = removeGood("gitlab.url", badOptions)
     }
     if api_opt, ok := args["-v"].(string); ok {
@@ -206,6 +212,8 @@ func main() { //testing
         token = token_opt
         badOptions = removeGood("gitlab.token", badOptions)
     }
+
+    root = scrubUrl(root)
 
     if len(badOptions) != 0 {
         complainUndefined(badOptions)
@@ -228,4 +236,5 @@ func main() { //testing
     fmt.Println("url:", root)
 
     fmt.Println(makeRemoteRepo(root, name, description, token, apiVersion, protection))
+    initialize(name, username, root)
 }
