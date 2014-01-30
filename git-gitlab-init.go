@@ -49,33 +49,6 @@ Options:
 `
 )
 
-// findInSlice searches the given slice for a 2-array where element 0 equals the
-// given string and returns its index.
-func findInSlice(s string, slice [][2]string) int {
-    for i, v := range slice {
-        if v[0] == s {
-            return i
-        }
-    }
-    return -1
-}
-
-// removeFromSlice removes the element with the given index from the given
-// slice and returns the resulting slice.
-func removeFromSlice(i int, slice [][2]string) [][2]string {
-    return append(slice[:i], slice[i+1:]...)
-}
-
-// removeGood removes the first 2-array it finds (in the given slice) where
-// element 0 equals the given string.
-func removeGood(s string, slice [][2]string) [][2]string {
-    i := findInSlice(s, slice)
-    if i != -1 {
-        return removeFromSlice(i, slice)
-    }
-    return [][2]string{}
-}
-
 // scrubUrl adds a trailing backslash to the given url if there isn't one
 // already.
 func scrubUrl(webaddress string) string {
@@ -174,27 +147,59 @@ func getSetting(setting string) (value string, err error) {
     return
 }
 
-// softGetSetting scrapes `git config` for the given setting and outputs its
+type ConfigOptionHelp [2]string
+type BadConfigOptions []ConfigOptionHelp
+
+// Find searches the given option slice for an option helper where element 0
+// (the option itself) equals the given string and returns its index.
+func (bad_options BadConfigOptions) Find(s string) int {
+    for i, bad_opt := range bad_options {
+        if bad_opt[0] == s {
+            return i
+        }
+    }
+    return -1 // #TODO: implement as an err
+}
+
+// Remove removes the element with the given index from the given option slice
+// and returns the resulting option slice.
+func (bad_options BadConfigOptions) Remove(i int) BadConfigOptions {
+    return append(bad_options[:i], bad_options[i+1:]...)
+    // #TODO: implement IndexError as an err
+}
+
+// RemoveByKey removes the first 2-array it finds (in the given slice) where
+// element 0 equals the given string.
+func (bad_options BadConfigOptions) RemoveByKey(s string) BadConfigOptions {
+    i := bad_options.Find(s)
+    if i != -1 {
+        return bad_options.Remove(i)
+    }
+    return BadConfigOptions{}
+}
+
+// GetSetting scrapes `git config` for the given setting and outputs its
 // value if it exists; otherwise the option and a short description are added
 // to a running slice of undefined options.
-func softGetSetting(setting string, setting_help_description string, bad_options [][2]string) (value string, new_bad_options [][2]string) {
+func (bad_options BadConfigOptions) GetSetting(setting string, setting_help_description string) (new_bad_options BadConfigOptions, value string) {
     value, err := getSetting(setting)
     if err != nil {
-        new_bad_options = append(bad_options, [2]string{setting, setting_help_description})
+        this_bad_option := ConfigOptionHelp{setting, setting_help_description}
+        new_bad_options = append(bad_options, this_bad_option)
     } else {
         new_bad_options = bad_options
     }
     return
 }
 
-// complainUndefined prints a pretty error message explaining how to remedy
+// Complain prints a pretty error message explaining how to remedy
 // configuration issues à la the official git subcommands.
-func complainUndefined(bad_options [][2]string) {
+func (bad_options BadConfigOptions) Complain() {
     fmt.Println("Error! Your Gitlab API settings aren't defined.")
     fmt.Println("Try running the following:\n")
-    var param [2]string
-    for _, param = range bad_options {
-        setting, desc := param[0], param[1]
+    var this_bad_option ConfigOptionHelp
+    for _, this_bad_option = range bad_options {
+        setting, desc := this_bad_option[0], this_bad_option[1]
         fmt.Println("    git config --global " + setting + " \"" + desc + "\"")
     }
     fmt.Println("")
@@ -202,12 +207,12 @@ func complainUndefined(bad_options [][2]string) {
 
 // varsFromGitConfig scrapes `git config` for all the necessary gitlab API
 // authentication information
-func varsFromGitConfig() (gitlab_username string, gitlab_root_address string, gitlab_api_version string, gitlab_api_token string, bad_options [][2]string) {
-    gitlab_username, bad_options = softGetSetting("gitlab.username", "gitlabusername", bad_options)
-    gitlab_root_address, bad_options = softGetSetting("gitlab.url", "http://my.gitlab.instance/", bad_options)
+func varsFromGitConfig() (bad_options BadConfigOptions, gitlab_username string, gitlab_root_address string, gitlab_api_version string, gitlab_api_token string) {
+    bad_options, gitlab_username = bad_options.GetSetting("gitlab.username", "gitlabusername")
+    bad_options, gitlab_root_address = bad_options.GetSetting("gitlab.url", "http://my.gitlab.instance/")
     gitlab_root_address = scrubUrl(gitlab_root_address)
-    gitlab_api_version, bad_options = softGetSetting("gitlab.api", "v3", bad_options)
-    gitlab_api_token, bad_options = softGetSetting("gitlab.token", "your_gitlab_token", bad_options)
+    bad_options, gitlab_api_version = bad_options.GetSetting("gitlab.api", "v3")
+    bad_options, gitlab_api_token = bad_options.GetSetting("gitlab.token", "your_gitlab_token")
     return
 }
 
@@ -221,7 +226,7 @@ func main() {
     debug := args["--debug"].(bool)
 
     // Scraping config files for API credentials
-    gitlab_username, gitlab_root_address, gitlab_api_version, gitlab_api_token, bad_options := varsFromGitConfig()
+    bad_options, gitlab_username, gitlab_root_address, gitlab_api_version, gitlab_api_token := varsFromGitConfig()
     if debug {
         fmt.Println(args)
     }
@@ -229,25 +234,25 @@ func main() {
     // Overriding config parameters from docopt
     if gitlab_username_opt, ok := args["-u"].(string); ok {
         gitlab_username = gitlab_username_opt
-        bad_options = removeGood("gitlab.username", bad_options)
+        bad_options = bad_options.RemoveByKey("gitlab.username")
     }
     if gitlab_root_address_opt, ok := args["-l"].(string); ok {
         gitlab_root_address = gitlab_root_address_opt
-        bad_options = removeGood("gitlab.url", bad_options)
+        bad_options = bad_options.RemoveByKey("gitlab.url")
     }
     if api_opt, ok := args["-v"].(string); ok {
         gitlab_api_version = api_opt
-        bad_options = removeGood("gitlab.api", bad_options)
+        bad_options = bad_options.RemoveByKey("gitlab.api")
     }
     if gitlab_api_token_opt, ok := args["-t"].(string); ok {
         gitlab_api_token = gitlab_api_token_opt
-        bad_options = removeGood("gitlab.token", bad_options)
+        bad_options = bad_options.RemoveByKey("gitlab.token")
     }
 
     gitlab_root_address = scrubUrl(gitlab_root_address)
 
     if len(bad_options) != 0 {
-        complainUndefined(bad_options)
+        bad_options.Complain()
         return
     }
 
