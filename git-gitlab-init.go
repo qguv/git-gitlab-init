@@ -21,6 +21,7 @@ var (
     docopt_argument_source      []string = os.Args[1:]
     docopt_autohelp_enabled     bool     = true
     docopt_optionsfirst_enabled bool     = true
+    gitlab_default_api          string   = "v3"
     docopt_usage_pattern        string   = `git gitlab-init
 
 Create an empty Git repository on GitLab and locally.
@@ -42,7 +43,7 @@ Options:
   -d DESCRIPTION    Specify repository description.
   -u USERNAME       Specify Gitlab username.
   -l URL            Specify Gitlab instance url.
-  -v API_VERSION    Specify Gitlab api version url. [default: v3]
+  -v API_VERSION    Specify Gitlab api version.
   -t API_TOKEN      Specify Gitlab api token, found in your Gitlab profile settings.
   --debug           You hopefully won't need this option.
   --version         Prints version and exits.
@@ -210,7 +211,6 @@ func (bad_options BadConfigOptions) Complain() {
 func varsFromGitConfig() (bad_options BadConfigOptions, gitlab_username string, gitlab_root_address string, gitlab_api_version string, gitlab_api_token string) {
     bad_options, gitlab_username = bad_options.GetSetting("gitlab.username", "gitlabusername")
     bad_options, gitlab_root_address = bad_options.GetSetting("gitlab.url", "http://my.gitlab.instance/")
-    gitlab_root_address = scrubUrl(gitlab_root_address)
     bad_options, gitlab_api_version = bad_options.GetSetting("gitlab.api", "v3")
     bad_options, gitlab_api_token = bad_options.GetSetting("gitlab.token", "your_gitlab_token")
     return
@@ -231,30 +231,54 @@ func main() {
         fmt.Println(args)
     }
 
+    if debug {
+        fmt.Println("\nbad_options before cli option override:\n")
+        fmt.Println(bad_options)
+        fmt.Println("\n")
+    }
+
     // Overriding config parameters from docopt
     if gitlab_username_opt, ok := args["-u"].(string); ok {
+        if debug {
+            fmt.Println("overriding username with " + gitlab_username_opt)
+        }
         gitlab_username = gitlab_username_opt
         bad_options = bad_options.RemoveByKey("gitlab.username")
     }
     if gitlab_root_address_opt, ok := args["-l"].(string); ok {
+        if debug {
+            fmt.Println("overriding root url with " + gitlab_root_address_opt)
+        }
         gitlab_root_address = gitlab_root_address_opt
         bad_options = bad_options.RemoveByKey("gitlab.url")
     }
     if api_opt, ok := args["-v"].(string); ok {
+        if debug {
+            fmt.Println("overriding api version with " + api_opt)
+        }
         gitlab_api_version = api_opt
         bad_options = bad_options.RemoveByKey("gitlab.api")
     }
     if gitlab_api_token_opt, ok := args["-t"].(string); ok {
+        if debug {
+            fmt.Println("overriding api token with " + gitlab_api_token_opt)
+        }
         gitlab_api_token = gitlab_api_token_opt
         bad_options = bad_options.RemoveByKey("gitlab.token")
     }
 
-    gitlab_root_address = scrubUrl(gitlab_root_address)
+    if debug {
+        fmt.Println("\nbad_options after cli option override:\n")
+        fmt.Println(bad_options)
+        fmt.Println("\n")
+    }
 
     if len(bad_options) != 0 {
         bad_options.Complain()
         return
     }
+
+    gitlab_root_address = scrubUrl(gitlab_root_address)
 
     // Setting repo settings from docopt
     var repo_description string
