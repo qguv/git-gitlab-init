@@ -17,7 +17,7 @@ import (
 
 // Variables about gitlab-init
 var (
-    version                     string   = "0.1.1"
+    version                     string   = "0.1.2"
     docopt_argument_source      []string = os.Args[1:]
     docopt_autohelp_enabled     bool     = true
     docopt_optionsfirst_enabled bool     = true
