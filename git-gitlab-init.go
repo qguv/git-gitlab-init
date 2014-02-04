@@ -6,6 +6,7 @@ package main
 
 import (
     "fmt"
+    "errors"
     "github.com/docopt/docopt.go"
     "io/ioutil"
     "net/http"
@@ -70,31 +71,31 @@ func runCommand(name string, arg ...string) (string, error) {
 
 // initialize initializes a git repository locally with a barebones README.md
 // and a basic first commit.
-func initialize(project_name string, origin_username string, origin_root_address string) (ok bool) {
+func initialize(project_name string, origin_username string, origin_root_address string) error {
+    var err error
+
     runCommand("git", "init")
 
     f, err := os.Create("README.md")
     defer f.Close()
     if err != nil {
-        panic(err)
+        return err
     }
     _, err = f.WriteString("# " + project_name)
     if err != nil {
-        panic(err)
+        return err
     }
 
     origin_root_address = scrubUrl(origin_root_address)
     origin_relative_address := origin_username + "/" + project_name + ".git"
     origin_full_address := origin_root_address + origin_relative_address
 
-    runCommand("git", "add", "README.md")
-    runCommand("git", "commit", "-m", "initial commit")
-    runCommand("git", "remote", "add", "origin", origin_full_address)
-    runCommand("git", "push", "-u", "origin", "master")
+    _, err = runCommand("git", "add", "README.md")
+    _, err = runCommand("git", "commit", "-m", "initial commit")
+    _, err = runCommand("git", "remote", "add", "origin", origin_full_address)
+    _, err = runCommand("git", "push", "-u", "origin", "master")
 
-    // #TODO: detect problems with runCommand and throw errors
-
-    return true // ok
+    return err
 }
 
 // sendPost sends a HTTP POST request to the given url with given payload.
@@ -153,30 +154,44 @@ type BadConfigOptions []ConfigOptionHelp
 
 // Find searches the given option slice for an option helper where element 0
 // (the option itself) equals the given string and returns its index.
-func (bad_options BadConfigOptions) Find(s string) int {
+func (bad_options BadConfigOptions) Find(s string) (int, error) {
+    var err error
+    if len(bad_options) == 0 {
+        err = errors.New("BadConfigOptions is empty")
+        return 0, err
+    }
     for i, bad_opt := range bad_options {
         if bad_opt[0] == s {
-            return i
+            return i, err
         }
     }
-    return -1 // #TODO: implement as an err
+    err = errors.New("could not find \"" + s + "\" in BadConfigOptions")
+    return 0, err
 }
 
 // Remove removes the element with the given index from the given option slice
 // and returns the resulting option slice.
-func (bad_options BadConfigOptions) Remove(i int) BadConfigOptions {
-    return append(bad_options[:i], bad_options[i+1:]...)
-    // #TODO: implement IndexError as an err
+func (bad_options BadConfigOptions) Remove(i int) (new_bad_options BadConfigOptions, err error) {
+    if len(bad_options) != 0 {
+        new_bad_options = append(bad_options[:i], bad_options[i+1:]...)
+        return
+    }
+    err_text := fmt.Sprintf("slice is blank! can't get item at [%d]", i)
+    err = errors.New(err_text)
+    return
+
 }
 
 // RemoveByKey removes the first 2-array it finds (in the given slice) where
 // element 0 equals the given string.
-func (bad_options BadConfigOptions) RemoveByKey(s string) BadConfigOptions {
-    i := bad_options.Find(s)
-    if i != -1 {
-        return bad_options.Remove(i)
+func (bad_options BadConfigOptions) RemoveByKey(s string) (BadConfigOptions, error) {
+    var new_bad_options BadConfigOptions
+    i, err := bad_options.Find(s)
+    if err != nil {
+        return new_bad_options, err
     }
-    return BadConfigOptions{}
+    new_bad_options, err = bad_options.Remove(i)
+    return new_bad_options, err
 }
 
 // GetSetting scrapes `git config` for the given setting and outputs its
@@ -217,6 +232,8 @@ func varsFromGitConfig() (bad_options BadConfigOptions, gitlab_username string, 
 }
 
 func main() {
+    var err error
+
     args, err := docopt.Parse(docopt_usage_pattern, docopt_argument_source, docopt_autohelp_enabled, version, docopt_optionsfirst_enabled)
     if err != nil {
         panic(err)
@@ -243,28 +260,40 @@ func main() {
             fmt.Println("overriding username with " + gitlab_username_opt)
         }
         gitlab_username = gitlab_username_opt
-        bad_options = bad_options.RemoveByKey("gitlab.username")
+        bad_options, err = bad_options.RemoveByKey("gitlab.username")
+        if err != nil {
+            panic(err)
+        }
     }
     if gitlab_root_address_opt, ok := args["-l"].(string); ok {
         if debug {
             fmt.Println("overriding root url with " + gitlab_root_address_opt)
         }
         gitlab_root_address = gitlab_root_address_opt
-        bad_options = bad_options.RemoveByKey("gitlab.url")
+        bad_options, err = bad_options.RemoveByKey("gitlab.url")
+        if err != nil {
+            panic(err)
+        }
     }
     if api_opt, ok := args["-v"].(string); ok {
         if debug {
             fmt.Println("overriding api version with " + api_opt)
         }
         gitlab_api_version = api_opt
-        bad_options = bad_options.RemoveByKey("gitlab.api")
+        bad_options, err = bad_options.RemoveByKey("gitlab.api")
+        if err != nil {
+            panic(err)
+        }
     }
     if gitlab_api_token_opt, ok := args["-t"].(string); ok {
         if debug {
             fmt.Println("overriding api token with " + gitlab_api_token_opt)
         }
         gitlab_api_token = gitlab_api_token_opt
-        bad_options = bad_options.RemoveByKey("gitlab.token")
+        bad_options, err = bad_options.RemoveByKey("gitlab.token")
+        if err != nil {
+            panic(err)
+        }
     }
 
     if debug {
@@ -302,5 +331,8 @@ func main() {
         fmt.Println(response)
     }
 
-    initialize(repo_name, gitlab_username, gitlab_root_address)
+    err = initialize(repo_name, gitlab_username, gitlab_root_address)
+    if err != nil {
+        panic(err)
+    }
 }
